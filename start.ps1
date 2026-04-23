@@ -1,3 +1,7 @@
+# Install and import OSD module in WinPE
+Install-Module OSD -Force -SkipPublisherCheck
+Import-Module OSD -Force
+
 $Params = @{
     OSVersion  = 'Windows 11'
     OSBuild    = '24H2'
@@ -8,3 +12,4 @@ $Params = @{
 }
 
 Start-OSDCloud @Params
+
