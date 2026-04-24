@@ -76,8 +76,8 @@ Start-OSDCloud @Params
 # =====================================================================
 
 # Write AutoCreateUser.ps1 with pre-collected user data baked in
-$SetupScriptsDir = 'C:\Windows\Setup\Scripts\SetupComplete'
-if (-not (Test-Path $SetupScriptsDir)) { New-Item -Path $SetupScriptsDir -ItemType Directory -Force | Out-Null }
+$SetupScriptsPath = 'C:\Windows\Setup\Scripts'
+if (-not (Test-Path $SetupScriptsPath)) { New-Item -Path $SetupScriptsPath -ItemType Directory -Force | Out-Null }
 
 $AutoCreateScript = @"
 `$Username = '$NewUser'
@@ -88,15 +88,22 @@ New-LocalUser -Name `$Username -Password `$Password -FullName `$FullName -ErrorA
 Add-LocalGroupMember -Group Administrators -Member `$Username -ErrorAction SilentlyContinue
 $ForceResetLine
 
-# Self-delete then log off itadmin to land on login screen
 Remove-Item -Path `$MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
-Start-Process 'logoff.exe'
 "@
 
-Set-Content -Path "$SetupScriptsDir\AutoCreateUser.ps1" -Value $AutoCreateScript -Encoding UTF8
-Write-Host "AutoCreateUser.ps1 written." -ForegroundColor Green
+Set-Content -Path "$SetupScriptsPath\AutoCreateUser.ps1" -Value $AutoCreateScript -Encoding UTF8
 
-# Write unattend.xml to skip OOBE, create itadmin, auto-logon once to trigger AutoCreateUser.ps1
+# Write or append to SetupComplete.cmd
+$SetupCompleteCmd = "$SetupScriptsPath\SetupComplete.cmd"
+$CallLine = 'PowerShell -NoProfile -ExecutionPolicy Bypass -File "C:\Windows\Setup\Scripts\AutoCreateUser.ps1"'
+if (Test-Path $SetupCompleteCmd) {
+    Add-Content -Path $SetupCompleteCmd -Value "`r`n$CallLine"
+} else {
+    Set-Content -Path $SetupCompleteCmd -Value "@echo off`r`n$CallLine" -Encoding ASCII
+}
+Write-Host "AutoCreateUser.ps1 and SetupComplete.cmd written." -ForegroundColor Green
+
+# Write unattend.xml to skip OOBE and create itadmin account
 $PantherPath = 'C:\Windows\Panther'
 if (-not (Test-Path $PantherPath)) { New-Item -Path $PantherPath -ItemType Directory -Force | Out-Null }
 
@@ -134,23 +141,6 @@ $UnattendXML = @"
                     </LocalAccount>
                 </LocalAccounts>
             </UserAccounts>
-            <AutoLogon>
-                <Password>
-                    <Value>$itAdminPass</Value>
-                    <PlainText>true</PlainText>
-                </Password>
-                <Enabled>true</Enabled>
-                <LogonCount>1</LogonCount>
-                <Username>itadmin</Username>
-            </AutoLogon>
-            <FirstLogonCommands>
-                <SynchronousCommand wcm:action="add">
-                    <CommandLine>PowerShell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\Windows\Setup\Scripts\SetupComplete\AutoCreateUser.ps1"</CommandLine>
-                    <Description>Create User Account</Description>
-                    <Order>1</Order>
-                    <RequiresUserInput>false</RequiresUserInput>
-                </SynchronousCommand>
-            </FirstLogonCommands>
         </component>
     </settings>
 </unattend>
@@ -158,16 +148,6 @@ $UnattendXML = @"
 
 Set-Content -Path "$PantherPath\unattend.xml" -Value $UnattendXML -Encoding UTF8
 Write-Host "unattend.xml written - OOBE will be skipped on first boot." -ForegroundColor Green
-
-# Set auto-logon directly in the new OS registry (more reliable than unattend.xml AutoLogon)
-$SoftwareHive = 'C:\Windows\System32\config\SOFTWARE'
-reg load HKLM\NewOS $SoftwareHive | Out-Null
-reg add "HKLM\NewOS\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon  /t REG_SZ  /d "1"        /f | Out-Null
-reg add "HKLM\NewOS\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultUsername /t REG_SZ  /d "itadmin"  /f | Out-Null
-reg add "HKLM\NewOS\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultPassword /t REG_SZ  /d "$itAdminPass" /f | Out-Null
-reg add "HKLM\NewOS\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoLogonCount  /t REG_DWORD /d "1"      /f | Out-Null
-reg unload HKLM\NewOS | Out-Null
-Write-Host "Auto-logon registry keys set." -ForegroundColor Green
 
 # =====================================================================
 # COUNTDOWN RESTART
