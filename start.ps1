@@ -29,3 +29,13 @@ $Params = @{
 }
 
 Start-OSDCloud @Params
+
+# Countdown restart
+$Countdown = 30
+Write-Host "`nImaging complete. Restarting in $Countdown seconds..." -ForegroundColor Green
+for ($i = $Countdown; $i -gt 0; $i--) {
+    Write-Host "  Restarting in $i seconds...  " -ForegroundColor Yellow -NoNewline
+    Write-Host "`r" -NoNewline
+    Start-Sleep -Seconds 1
+}
+Restart-Computer -Force
