@@ -27,18 +27,9 @@ do {
 $NewFullName = Read-Host "Customer's full name (e.g. Ghostface Chilla)"
 
 # User password
-$PassChoice = $null
-while ($PassChoice -notin @('1','2')) {
-    $PassChoice = Read-Host "`n1 = custom temporary password  /  2 = default password (P@ssw0rd)"
-}
-
-if ($PassChoice -eq '1') {
-    $UserPassSecure = Read-Host "Temporary password for $NewUser" -AsSecureString
-    $UserPass = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
-        [Runtime.InteropServices.Marshal]::SecureStringToBSTR($UserPassSecure))
-} else {
-    $UserPass = 'P@ssw0rd'
-}
+$UserPassSecure = Read-Host "`nTemporary password for $NewUser" -AsSecureString
+$UserPass = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+    [Runtime.InteropServices.Marshal]::SecureStringToBSTR($UserPassSecure))
 
 # Force password reset
 $ResetChoice = Read-Host "`nForce password reset on first logon? (yes/no)"
@@ -167,6 +158,16 @@ $UnattendXML = @"
 
 Set-Content -Path "$PantherPath\unattend.xml" -Value $UnattendXML -Encoding UTF8
 Write-Host "unattend.xml written - OOBE will be skipped on first boot." -ForegroundColor Green
+
+# Set auto-logon directly in the new OS registry (more reliable than unattend.xml AutoLogon)
+$SoftwareHive = 'C:\Windows\System32\config\SOFTWARE'
+reg load HKLM\NewOS $SoftwareHive | Out-Null
+reg add "HKLM\NewOS\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon  /t REG_SZ  /d "1"        /f | Out-Null
+reg add "HKLM\NewOS\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultUsername /t REG_SZ  /d "itadmin"  /f | Out-Null
+reg add "HKLM\NewOS\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultPassword /t REG_SZ  /d "$itAdminPass" /f | Out-Null
+reg add "HKLM\NewOS\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoLogonCount  /t REG_DWORD /d "1"      /f | Out-Null
+reg unload HKLM\NewOS | Out-Null
+Write-Host "Auto-logon registry keys set." -ForegroundColor Green
 
 # =====================================================================
 # COUNTDOWN RESTART
