@@ -34,7 +34,6 @@ $UserPass = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
 # Force password reset
 $ResetChoice = Read-Host "`nForce password reset on first logon? (yes/no)"
 $ForceReset  = $ResetChoice -eq 'yes'
-$ForceResetLine = if ($ForceReset) { "net user `"$NewUser`" /logonpasswordchg:yes" } else { '' }
 
 Write-Host "`nAll inputs collected. Starting imaging - you can walk away." -ForegroundColor Green
 
@@ -75,37 +74,11 @@ Start-OSDCloud @Params
 # POST-IMAGING: Write AutoCreateUser.ps1 and unattend.xml to new OS
 # =====================================================================
 
-# Write AutoCreateUser.ps1 with pre-collected user data baked in
-$SetupScriptsPath = 'C:\Windows\Setup\Scripts'
-if (-not (Test-Path $SetupScriptsPath)) { New-Item -Path $SetupScriptsPath -ItemType Directory -Force | Out-Null }
-
-$AutoCreateScript = @"
-`$Username = '$NewUser'
-`$FullName  = '$NewFullName'
-`$Password  = ConvertTo-SecureString '$UserPass' -AsPlainText -Force
-
-New-LocalUser -Name `$Username -Password `$Password -FullName `$FullName -ErrorAction SilentlyContinue
-Add-LocalGroupMember -Group Administrators -Member `$Username -ErrorAction SilentlyContinue
-$ForceResetLine
-
-Remove-Item -Path `$MyInvocation.MyCommand.Path -Force -ErrorAction SilentlyContinue
-"@
-
-Set-Content -Path "$SetupScriptsPath\AutoCreateUser.ps1" -Value $AutoCreateScript -Encoding UTF8
-
-# Write or append to SetupComplete.cmd
-$SetupCompleteCmd = "$SetupScriptsPath\SetupComplete.cmd"
-$CallLine = 'PowerShell -NoProfile -ExecutionPolicy Bypass -File "C:\Windows\Setup\Scripts\AutoCreateUser.ps1"'
-if (Test-Path $SetupCompleteCmd) {
-    Add-Content -Path $SetupCompleteCmd -Value "`r`n$CallLine"
-} else {
-    Set-Content -Path $SetupCompleteCmd -Value "@echo off`r`n$CallLine" -Encoding ASCII
-}
-Write-Host "AutoCreateUser.ps1 and SetupComplete.cmd written." -ForegroundColor Green
-
-# Write unattend.xml to skip OOBE and create itadmin account
+# Write unattend.xml to skip OOBE and create both accounts
 $PantherPath = 'C:\Windows\Panther'
 if (-not (Test-Path $PantherPath)) { New-Item -Path $PantherPath -ItemType Directory -Force | Out-Null }
+
+$ForceResetCmd = if ($ForceReset) { "<SynchronousCommand wcm:action=`"add`"><CommandLine>net user `"$NewUser`" /logonpasswordchg:yes</CommandLine><Order>1</Order></SynchronousCommand>" } else { '' }
 
 $UnattendXML = @"
 <?xml version="1.0" encoding="utf-8"?>
@@ -139,15 +112,27 @@ $UnattendXML = @"
                         <Group>Administrators</Group>
                         <Name>itadmin</Name>
                     </LocalAccount>
+                    <LocalAccount wcm:action="add">
+                        <Password>
+                            <Value>$UserPass</Value>
+                            <PlainText>true</PlainText>
+                        </Password>
+                        <DisplayName>$NewFullName</DisplayName>
+                        <Group>Administrators</Group>
+                        <Name>$NewUser</Name>
+                    </LocalAccount>
                 </LocalAccounts>
             </UserAccounts>
+            <FirstLogonCommands>
+                $ForceResetCmd
+            </FirstLogonCommands>
         </component>
     </settings>
 </unattend>
 "@
 
 Set-Content -Path "$PantherPath\unattend.xml" -Value $UnattendXML -Encoding UTF8
-Write-Host "unattend.xml written - OOBE will be skipped on first boot." -ForegroundColor Green
+Write-Host "unattend.xml written - both accounts will be created on first boot." -ForegroundColor Green
 
 # =====================================================================
 # COUNTDOWN RESTART
