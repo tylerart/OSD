@@ -78,7 +78,16 @@ Start-OSDCloud @Params
 $PantherPath = 'C:\Windows\Panther'
 if (-not (Test-Path $PantherPath)) { New-Item -Path $PantherPath -ItemType Directory -Force | Out-Null }
 
-$ForceResetCmd = if ($ForceReset) { "<SynchronousCommand wcm:action=`"add`"><CommandLine>net user `"$NewUser`" /logonpasswordchg:yes</CommandLine><Order>1</Order></SynchronousCommand>" } else { '' }
+$FirstLogonBlock = if ($ForceReset) {
+@"
+            <FirstLogonCommands>
+                <SynchronousCommand wcm:action="add">
+                    <CommandLine>net user "$NewUser" /logonpasswordchg:yes</CommandLine>
+                    <Order>1</Order>
+                </SynchronousCommand>
+            </FirstLogonCommands>
+"@
+} else { '' }
 
 $UnattendXML = @"
 <?xml version="1.0" encoding="utf-8"?>
@@ -123,9 +132,7 @@ $UnattendXML = @"
                     </LocalAccount>
                 </LocalAccounts>
             </UserAccounts>
-            <FirstLogonCommands>
-                $ForceResetCmd
-            </FirstLogonCommands>
+$FirstLogonBlock
         </component>
     </settings>
 </unattend>
