@@ -59,13 +59,21 @@ Write-Host "OSD module loaded." -ForegroundColor Green
 # =====================================================================
 # IMAGE THE DEVICE
 # =====================================================================
+$Manufacturer = (Get-CimInstance -ClassName Win32_ComputerSystem).Manufacturer
+Write-Host "Detected manufacturer: $Manufacturer" -ForegroundColor Green
+
 $Params = @{
-    OSVersion  = 'Windows 11'
-    OSBuild    = '24H2'
-    OSEdition  = 'Enterprise'
-    OSLanguage = 'en-us'
-    OSLicense  = 'Volume'
-    ZTI        = $true
+    OSVersion       = 'Windows 11'
+    OSBuild         = '24H2'
+    OSEdition       = 'Enterprise'
+    OSLanguage      = 'en-us'
+    OSLicense       = 'Volume'
+    ZTI             = $true
+    SkipCloudDriver = ($Manufacturer -like '*Lenovo*')
+}
+
+if ($Params.SkipCloudDriver) {
+    Write-Host "Lenovo detected - skipping driver injection. Drivers will be handled post-enrollment." -ForegroundColor Yellow
 }
 
 Start-OSDCloud @Params
