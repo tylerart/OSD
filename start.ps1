@@ -46,7 +46,7 @@ while (-not (Get-Module -ListAvailable -Name OSD)) {
     $Attempt++
     Write-Host "Installing OSD module (attempt $Attempt of $MaxAttempts)..."
     Install-Module OSD -Force -SkipPublisherCheck -ErrorAction SilentlyContinue
-    if ($Attempt -ge $MaxAttempts) {
+    if ($Attempt -ge $MaxAttempts -and -not (Get-Module -ListAvailable -Name OSD)) {
         Write-Host "ERROR: OSD module failed to install after $MaxAttempts attempts." -ForegroundColor Red
         exit 1
     }
@@ -147,6 +147,22 @@ $FirstLogonBlock
     </settings>
 </unattend>
 "@
+
+# Remove any OSDCloud-staged provisioning packages on Lenovo before restart.
+# The model-specific DriverPack PPKG crashes Windows Setup during OOBE on Lenovo hardware.
+# Drivers are handled post-enrollment via Workspace ONE.
+if ($Manufacturer -like '*Lenovo*') {
+    Write-Host "Lenovo detected - removing staged DriverPack provisioning packages..." -ForegroundColor Yellow
+    $PPKGResults = & dism.exe /Image:C:\ /Get-ProvisioningPackageInfo 2>&1
+    $PackageNames = $PPKGResults | Select-String '^\s*PackageName\s*:\s*(.+)' | ForEach-Object {
+        $_.Matches[0].Groups[1].Value.Trim()
+    }
+    foreach ($Pkg in $PackageNames) {
+        Write-Host "  Removing: $Pkg" -ForegroundColor Yellow
+        & dism.exe /Image:C:\ /Remove-ProvisioningPackage /PackageName:"$Pkg" | Out-Null
+    }
+    Write-Host "DriverPack provisioning packages removed." -ForegroundColor Green
+}
 
 Set-Content -Path "$PantherPath\unattend.xml" -Value $UnattendXML -Encoding UTF8
 Write-Host "unattend.xml written - both accounts will be created on first boot." -ForegroundColor Green
