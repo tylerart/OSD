@@ -148,20 +148,14 @@ $FirstLogonBlock
 </unattend>
 "@
 
-# Remove any OSDCloud-staged provisioning packages on Lenovo before restart.
-# The model-specific DriverPack PPKG crashes Windows Setup during OOBE on Lenovo hardware.
-# Drivers are handled post-enrollment via Workspace ONE.
+# On Lenovo, remove the staged driver pack before restart.
+# OSDCloud copies the model-specific driver EXE to C:\Drivers and calls it via SetupComplete,
+# which crashes Windows Setup during first boot. Drivers are handled post-enrollment via Workspace ONE.
 if ($Manufacturer -like '*Lenovo*') {
-    Write-Host "Lenovo detected - removing staged DriverPack provisioning packages..." -ForegroundColor Yellow
-    $PPKGResults = & dism.exe /Image:C:\ /Get-ProvisioningPackageInfo 2>&1
-    $PackageNames = $PPKGResults | Select-String '^\s*PackageName\s*:\s*(.+)' | ForEach-Object {
-        $_.Matches[0].Groups[1].Value.Trim()
+    if (Test-Path 'C:\Drivers') {
+        Remove-Item 'C:\Drivers' -Recurse -Force
+        Write-Host "Lenovo: removed staged drivers from C:\Drivers - will be handled post-enrollment." -ForegroundColor Yellow
     }
-    foreach ($Pkg in $PackageNames) {
-        Write-Host "  Removing: $Pkg" -ForegroundColor Yellow
-        & dism.exe /Image:C:\ /Remove-ProvisioningPackage /PackageName:"$Pkg" | Out-Null
-    }
-    Write-Host "DriverPack provisioning packages removed." -ForegroundColor Green
 }
 
 Set-Content -Path "$PantherPath\unattend.xml" -Value $UnattendXML -Encoding UTF8
