@@ -148,13 +148,35 @@ $FirstLogonBlock
 </unattend>
 "@
 
-# On Lenovo, remove the staged driver pack before restart.
-# OSDCloud copies the model-specific driver EXE to C:\Drivers and calls it via SetupComplete,
-# which crashes Windows Setup during first boot. Drivers are handled post-enrollment via Workspace ONE.
-if ($Manufacturer -like '*Lenovo*') {
-    if (Test-Path 'C:\Drivers') {
-        Remove-Item 'C:\Drivers' -Recurse -Force
-        Write-Host "Lenovo: removed staged drivers from C:\Drivers - will be handled post-enrollment." -ForegroundColor Yellow
+# On Lenovo, the staged driver pack EXE has been known to crash Windows Setup during first boot.
+# Prompt the tech to decide whether to keep or remove it.
+if ($Manufacturer -like '*Lenovo*' -and (Test-Path 'C:\Drivers')) {
+    $DriverExe = Get-ChildItem 'C:\Drivers' -Filter '*.exe' -Recurse -ErrorAction SilentlyContinue |
+                 Select-Object -First 1
+
+    if ($DriverExe) {
+        Write-Host "`n========================================" -ForegroundColor Cyan
+        Write-Host "  Lenovo Driver Pack Detected" -ForegroundColor Cyan
+        Write-Host "========================================" -ForegroundColor Cyan
+        Write-Host "  File: $($DriverExe.Name)" -ForegroundColor White
+        Write-Host ""
+        Write-Host "  Known issue: this EXE may force a restart" -ForegroundColor Yellow
+        Write-Host "  during Windows Setup and cause a BSOD." -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "  [Y] Keep drivers - let SetupComplete install them" -ForegroundColor Green
+        Write-Host "  [N] Remove drivers - skip install, handle manually later" -ForegroundColor Red
+        Write-Host ""
+
+        do {
+            $DriverChoice = Read-Host "  Keep Lenovo driver pack? (y/n)"
+        } while ($DriverChoice -notmatch '^[YyNn]$')
+
+        if ($DriverChoice -match '^[Nn]$') {
+            Remove-Item 'C:\Drivers' -Recurse -Force
+            Write-Host "Driver pack removed - handle drivers manually post-imaging." -ForegroundColor Yellow
+        } else {
+            Write-Host "Driver pack kept - SetupComplete will install on first boot." -ForegroundColor Green
+        }
     }
 }
 
