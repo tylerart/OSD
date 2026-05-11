@@ -88,12 +88,24 @@ Start-OSDCloud @Params
 $PantherPath = 'C:\Windows\Panther'
 if (-not (Test-Path $PantherPath)) { New-Item -Path $PantherPath -ItemType Directory -Force | Out-Null }
 
+# Write post-imaging install script - called by FirstLogonCommands to avoid XML quoting/length issues
+$SetupScriptsPath = 'C:\Windows\Setup\Scripts'
+if (-not (Test-Path $SetupScriptsPath)) { New-Item -Path $SetupScriptsPath -ItemType Directory -Force | Out-Null }
+
+Set-Content -Path "$SetupScriptsPath\PostImaging.ps1" -Encoding UTF8 -Value @'
+Start-Sleep -Seconds 30
+winget install --id Google.Chrome --exact --silent --accept-package-agreements --accept-source-agreements --scope machine
+Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+Install-Module PSWindowsUpdate -Force -SkipPublisherCheck -Scope AllUsers
+'@
+
 $ResetCommand = if ($ForceReset) {
 @"
 
                 <SynchronousCommand wcm:action="add">
                     <CommandLine>net user "$NewUser" /logonpasswordchg:yes</CommandLine>
-                    <Order>3</Order>
+                    <Order>2</Order>
                 </SynchronousCommand>
 "@
 } else { '' }
@@ -101,12 +113,8 @@ $ResetCommand = if ($ForceReset) {
 $FirstLogonBlock = @"
             <FirstLogonCommands>
                 <SynchronousCommand wcm:action="add">
-                    <CommandLine>powershell -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 30; winget install --id Google.Chrome --exact --silent --accept-package-agreements --accept-source-agreements --scope machine"</CommandLine>
+                    <CommandLine>powershell -ExecutionPolicy Bypass -File C:\Windows\Setup\Scripts\PostImaging.ps1</CommandLine>
                     <Order>1</Order>
-                </SynchronousCommand>
-                <SynchronousCommand wcm:action="add">
-                    <CommandLine>powershell -ExecutionPolicy Bypass -Command "Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force; Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; Install-Module PSWindowsUpdate -Force -SkipPublisherCheck -Scope AllUsers"</CommandLine>
-                    <Order>2</Order>
                 </SynchronousCommand>$ResetCommand
             </FirstLogonCommands>
 "@
