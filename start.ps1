@@ -101,11 +101,11 @@ $ResetCommand = if ($ForceReset) {
 $FirstLogonBlock = @"
             <FirstLogonCommands>
                 <SynchronousCommand wcm:action="add">
-                    <CommandLine>winget install --id Google.Chrome --exact --silent --accept-package-agreements --accept-source-agreements</CommandLine>
+                    <CommandLine>powershell -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 30; winget install --id Google.Chrome --exact --silent --accept-package-agreements --accept-source-agreements --scope machine"</CommandLine>
                     <Order>1</Order>
                 </SynchronousCommand>
                 <SynchronousCommand wcm:action="add">
-                    <CommandLine>powershell -Command "Install-Module PSWindowsUpdate -Force -SkipPublisherCheck"</CommandLine>
+                    <CommandLine>powershell -ExecutionPolicy Bypass -Command "Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force; Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; Install-Module PSWindowsUpdate -Force -SkipPublisherCheck -Scope AllUsers"</CommandLine>
                     <Order>2</Order>
                 </SynchronousCommand>$ResetCommand
             </FirstLogonCommands>
