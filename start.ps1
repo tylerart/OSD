@@ -93,7 +93,7 @@ $ResetCommand = if ($ForceReset) {
 
                 <SynchronousCommand wcm:action="add">
                     <CommandLine>net user "$NewUser" /logonpasswordchg:yes</CommandLine>
-                    <Order>2</Order>
+                    <Order>3</Order>
                 </SynchronousCommand>
 "@
 } else { '' }
@@ -103,6 +103,10 @@ $FirstLogonBlock = @"
                 <SynchronousCommand wcm:action="add">
                     <CommandLine>winget install --id Google.Chrome --exact --silent --accept-package-agreements --accept-source-agreements</CommandLine>
                     <Order>1</Order>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <CommandLine>powershell -Command "Install-Module PSWindowsUpdate -Force -SkipPublisherCheck"</CommandLine>
+                    <Order>2</Order>
                 </SynchronousCommand>$ResetCommand
             </FirstLogonCommands>
 "@
