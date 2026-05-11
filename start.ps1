@@ -88,16 +88,24 @@ Start-OSDCloud @Params
 $PantherPath = 'C:\Windows\Panther'
 if (-not (Test-Path $PantherPath)) { New-Item -Path $PantherPath -ItemType Directory -Force | Out-Null }
 
-$FirstLogonBlock = if ($ForceReset) {
+$ResetCommand = if ($ForceReset) {
 @"
-            <FirstLogonCommands>
+
                 <SynchronousCommand wcm:action="add">
                     <CommandLine>net user "$NewUser" /logonpasswordchg:yes</CommandLine>
-                    <Order>1</Order>
+                    <Order>2</Order>
                 </SynchronousCommand>
-            </FirstLogonCommands>
 "@
 } else { '' }
+
+$FirstLogonBlock = @"
+            <FirstLogonCommands>
+                <SynchronousCommand wcm:action="add">
+                    <CommandLine>winget install --id Google.Chrome --exact --silent --accept-package-agreements --accept-source-agreements</CommandLine>
+                    <Order>1</Order>
+                </SynchronousCommand>$ResetCommand
+            </FirstLogonCommands>
+"@
 
 $UnattendXML = @"
 <?xml version="1.0" encoding="utf-8"?>
