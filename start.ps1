@@ -106,13 +106,13 @@ Write-Host "PostImaging.ps1 copied from USB." -ForegroundColor Green
 
 # Build RunOnce command from config flags and register in the offline registry.
 # RunOnce fires after the shell loads so winget and PSGallery are fully available.
-$RunOnceCmd = 'powershell -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\Windows\Setup\Scripts\PostImaging.ps1'
+$RunOnceCmd = 'powershell -ExecutionPolicy Bypass -File C:\Windows\Setup\Scripts\PostImaging.ps1'
 if ($InstallChrome)          { $RunOnceCmd += ' -InstallChrome' }
 if ($InstallPSWindowsUpdate) { $RunOnceCmd += ' -InstallPSWindowsUpdate' }
 
 $HivePath = 'C:\Windows\System32\config\SOFTWARE'
 reg load HKLM\OFFLINEIMG $HivePath | Out-Null
-reg add "HKLM\OFFLINEIMG\Microsoft\Windows\CurrentVersion\RunOnce" /v "PostImaging" /t REG_SZ /d $RunOnceCmd /f | Out-Null
+New-ItemProperty -Path 'HKLM:\OFFLINEIMG\Microsoft\Windows\CurrentVersion\RunOnce' -Name 'PostImaging' -Value $RunOnceCmd -PropertyType String -Force | Out-Null
 [GC]::Collect()
 reg unload HKLM\OFFLINEIMG | Out-Null
 Write-Host "PostImaging RunOnce key registered in offline registry." -ForegroundColor Green
