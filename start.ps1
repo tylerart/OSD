@@ -95,16 +95,8 @@ Start-OSDCloud @Params
 $PantherPath = 'C:\Windows\Panther'
 if (-not (Test-Path $PantherPath)) { New-Item -Path $PantherPath -ItemType Directory -Force | Out-Null }
 
-# Copy PostImaging.ps1 from USB to new OS
-$SetupScriptsPath = 'C:\Windows\Setup\Scripts'
-if (-not (Test-Path $SetupScriptsPath)) { New-Item -Path $SetupScriptsPath -ItemType Directory -Force | Out-Null }
-
-$OSDCloudVolume    = Get-Volume | Where-Object { $_.FileSystemLabel -eq 'OSDCloud' } | Select-Object -First 1
-$PostImagingSource = "$($OSDCloudVolume.DriveLetter):\OSDCloud\Config\Scripts\PostImaging.ps1"
-Copy-Item -Path $PostImagingSource -Destination "$SetupScriptsPath\PostImaging.ps1" -Force
-Write-Host "PostImaging.ps1 copied from USB." -ForegroundColor Green
-
-# Build RunOnce command from config flags and register in the offline registry.
+# Register PostImaging.ps1 via RunOnce in the offline registry.
+# OSDCloud automatically copies Config\Scripts\SetupComplete\ to C:\Windows\Setup\Scripts\ on the new OS.
 # RunOnce fires after the shell loads so winget and PSGallery are fully available.
 $RunOnceCmd = 'powershell -ExecutionPolicy Bypass -File C:\Windows\Setup\Scripts\PostImaging.ps1'
 if ($InstallChrome)          { $RunOnceCmd += ' -InstallChrome' }
