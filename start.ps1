@@ -105,6 +105,8 @@ param(
     [switch]$InstallPSWindowsUpdate
 )
 
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force
+
 $LogFile = 'C:\Windows\Temp\PostImaging.log'
 function Write-Log ($Message) {
     $line = "$(Get-Date -Format 'HH:mm:ss') $Message"
@@ -117,8 +119,9 @@ Start-Sleep -Seconds 30
 
 if ($InstallChrome) {
     Write-Log "Installing Chrome via winget..."
-    winget install --id Google.Chrome --exact --silent --accept-package-agreements --accept-source-agreements --scope machine
-    Write-Log "Chrome install exit code: $LASTEXITCODE"
+    $wingetOut = winget install --id Google.Chrome --exact --silent --accept-package-agreements --accept-source-agreements 2>&1
+    Write-Log "Chrome output: $wingetOut"
+    Write-Log "Chrome exit code: $LASTEXITCODE"
 }
 
 if ($InstallPSWindowsUpdate) {
