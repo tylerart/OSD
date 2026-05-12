@@ -1,3 +1,10 @@
+# =====================================================================
+# POST-IMAGING CONFIGURATION
+# Toggle what gets installed on first logon
+# =====================================================================
+$InstallChrome          = $true
+$InstallPSWindowsUpdate = $true
+
 # Trust PSGallery and ensure NuGet provider is available
 Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction SilentlyContinue
 Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
@@ -88,36 +95,44 @@ Start-OSDCloud @Params
 $PantherPath = 'C:\Windows\Panther'
 if (-not (Test-Path $PantherPath)) { New-Item -Path $PantherPath -ItemType Directory -Force | Out-Null }
 
-# Write post-imaging install script - called by FirstLogonCommands to avoid XML quoting/length issues
+# Copy PostImaging.ps1 from USB to new OS
 $SetupScriptsPath = 'C:\Windows\Setup\Scripts'
 if (-not (Test-Path $SetupScriptsPath)) { New-Item -Path $SetupScriptsPath -ItemType Directory -Force | Out-Null }
 
-Set-Content -Path "$SetupScriptsPath\PostImaging.ps1" -Encoding UTF8 -Value @'
-Start-Sleep -Seconds 30
-winget install --id Google.Chrome --exact --silent --accept-package-agreements --accept-source-agreements --scope machine
-Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
-Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-Install-Module PSWindowsUpdate -Force -SkipPublisherCheck -Scope AllUsers
-'@
+$OSDCloudVolume    = Get-Volume | Where-Object { $_.FileSystemLabel -eq 'OSDCloud' } | Select-Object -First 1
+$PostImagingSource = "$($OSDCloudVolume.DriveLetter):\OSDCloud\Config\Scripts\PostImaging.ps1"
+Copy-Item -Path $PostImagingSource -Destination "$SetupScriptsPath\PostImaging.ps1" -Force
+Write-Host "PostImaging.ps1 copied from USB." -ForegroundColor Green
+
+# Build RunOnce command from config flags and register in the offline registry.
+# RunOnce fires after the shell loads so winget and PSGallery are fully available.
+$RunOnceCmd = 'powershell -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\Windows\Setup\Scripts\PostImaging.ps1'
+if ($InstallChrome)          { $RunOnceCmd += ' -InstallChrome' }
+if ($InstallPSWindowsUpdate) { $RunOnceCmd += ' -InstallPSWindowsUpdate' }
+
+$HivePath = 'C:\Windows\System32\config\SOFTWARE'
+reg load HKLM\OFFLINEIMG $HivePath | Out-Null
+reg add "HKLM\OFFLINEIMG\Microsoft\Windows\CurrentVersion\RunOnce" /v "PostImaging" /t REG_SZ /d $RunOnceCmd /f | Out-Null
+[GC]::Collect()
+reg unload HKLM\OFFLINEIMG | Out-Null
+Write-Host "PostImaging RunOnce key registered in offline registry." -ForegroundColor Green
 
 $ResetCommand = if ($ForceReset) {
 @"
 
                 <SynchronousCommand wcm:action="add">
                     <CommandLine>net user "$NewUser" /logonpasswordchg:yes</CommandLine>
-                    <Order>2</Order>
+                    <Order>1</Order>
                 </SynchronousCommand>
 "@
 } else { '' }
 
-$FirstLogonBlock = @"
-            <FirstLogonCommands>
-                <SynchronousCommand wcm:action="add">
-                    <CommandLine>powershell -ExecutionPolicy Bypass -File C:\Windows\Setup\Scripts\PostImaging.ps1</CommandLine>
-                    <Order>1</Order>
-                </SynchronousCommand>$ResetCommand
+$FirstLogonBlock = if ($ForceReset) {
+@"
+            <FirstLogonCommands>$ResetCommand
             </FirstLogonCommands>
 "@
+} else { '' }
 
 $UnattendXML = @"
 <?xml version="1.0" encoding="utf-8"?>
