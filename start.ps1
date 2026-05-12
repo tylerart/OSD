@@ -118,10 +118,20 @@ Write-Log "PostImaging started. InstallChrome=$InstallChrome InstallPSWindowsUpd
 Start-Sleep -Seconds 30
 
 if ($InstallChrome) {
-    Write-Log "Installing Chrome via winget..."
-    $wingetOut = winget install --id Google.Chrome --exact --silent --accept-package-agreements --accept-source-agreements 2>&1
-    Write-Log "Chrome output: $wingetOut"
-    Write-Log "Chrome exit code: $LASTEXITCODE"
+    $wingetExe = Get-ChildItem 'C:\Program Files\WindowsApps' -Filter 'winget.exe' -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -like '*DesktopAppInstaller*' } |
+        Select-Object -First 1 -ExpandProperty FullName
+
+    Write-Log "winget path: $wingetExe"
+
+    if (-not $wingetExe) {
+        Write-Log "ERROR: winget.exe not found - Chrome not installed."
+    } else {
+        Write-Log "Installing Chrome via winget..."
+        $wingetOut = & $wingetExe install --id Google.Chrome --exact --silent --accept-package-agreements --accept-source-agreements 2>&1
+        Write-Log "Chrome output: $wingetOut"
+        Write-Log "Chrome exit code: $LASTEXITCODE"
+    }
 }
 
 if ($InstallPSWindowsUpdate) {
