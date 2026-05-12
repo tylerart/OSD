@@ -95,8 +95,47 @@ Start-OSDCloud @Params
 $PantherPath = 'C:\Windows\Panther'
 if (-not (Test-Path $PantherPath)) { New-Item -Path $PantherPath -ItemType Directory -Force | Out-Null }
 
+# Write PostImaging.ps1 directly to the new OS
+$SetupScriptsPath = 'C:\Windows\Setup\Scripts'
+if (-not (Test-Path $SetupScriptsPath)) { New-Item -Path $SetupScriptsPath -ItemType Directory -Force | Out-Null }
+
+$PostImagingContent = @'
+param(
+    [switch]$InstallChrome,
+    [switch]$InstallPSWindowsUpdate
+)
+
+$LogFile = 'C:\Windows\Temp\PostImaging.log'
+function Write-Log ($Message) {
+    $line = "$(Get-Date -Format 'HH:mm:ss') $Message"
+    Add-Content -Path $LogFile -Value $line
+    Write-Host $line
+}
+
+Write-Log "PostImaging started. InstallChrome=$InstallChrome InstallPSWindowsUpdate=$InstallPSWindowsUpdate"
+Start-Sleep -Seconds 30
+
+if ($InstallChrome) {
+    Write-Log "Installing Chrome via winget..."
+    winget install --id Google.Chrome --exact --silent --accept-package-agreements --accept-source-agreements --scope machine
+    Write-Log "Chrome install exit code: $LASTEXITCODE"
+}
+
+if ($InstallPSWindowsUpdate) {
+    Write-Log "Installing PSWindowsUpdate..."
+    Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+    Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+    Install-Module PSWindowsUpdate -Force -SkipPublisherCheck -Scope AllUsers
+    Write-Log "PSWindowsUpdate install done."
+}
+
+Write-Log "PostImaging complete."
+'@
+
+Set-Content -Path "$SetupScriptsPath\PostImaging.ps1" -Value $PostImagingContent -Encoding UTF8
+Write-Host "PostImaging.ps1 written to new OS." -ForegroundColor Green
+
 # Register PostImaging.ps1 via RunOnce in the offline registry.
-# OSDCloud automatically copies Config\Scripts\SetupComplete\ to C:\Windows\Setup\Scripts\ on the new OS.
 # RunOnce fires after the shell loads so winget and PSGallery are fully available.
 $RunOnceCmd = 'powershell -ExecutionPolicy Bypass -File C:\Windows\Setup\Scripts\PostImaging.ps1'
 if ($InstallChrome)          { $RunOnceCmd += ' -InstallChrome' }
