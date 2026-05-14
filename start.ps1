@@ -128,7 +128,7 @@ if ($InstallChrome) {
         Write-Log "ERROR: winget.exe not found - Chrome not installed."
     } else {
         Write-Log "Installing Chrome via winget..."
-        $wingetOut = & $wingetExe install --id Google.Chrome --exact --silent --accept-package-agreements --accept-source-agreements 2>&1
+        $wingetOut = & $wingetExe install --id Google.Chrome --exact --silent --accept-package-agreements --accept-source-agreements --source winget 2>&1
         Write-Log "Chrome output: $wingetOut"
         Write-Log "Chrome exit code: $LASTEXITCODE"
     }
