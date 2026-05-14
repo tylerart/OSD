@@ -105,8 +105,6 @@ param(
     [switch]$InstallPSWindowsUpdate
 )
 
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force
-
 $LogFile = 'C:\Windows\Temp\PostImaging.log'
 function Write-Log ($Message) {
     $line = "$(Get-Date -Format 'HH:mm:ss') $Message"
