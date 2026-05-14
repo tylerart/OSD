@@ -13,8 +13,11 @@ Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
 # COLLECT ALL INPUTS UPFRONT
 # Tech enters everything here before imaging begins - then walks away
 # =====================================================================
+$Manufacturer = (Get-CimInstance -ClassName Win32_ComputerSystem).Manufacturer
+
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  OSDCloud Imaging Setup" -ForegroundColor Cyan
+Write-Host "  Manufacturer: $Manufacturer" -ForegroundColor Cyan
 Write-Host "  Enter all details before imaging begins" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
 
@@ -42,6 +45,16 @@ $UserPass = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
 $ResetChoice = Read-Host "`nForce password reset on first logon? (yes/no)"
 $ForceReset  = $ResetChoice -eq 'yes'
 
+# Lenovo driver pack decision
+$KeepDrivers = $false
+if ($Manufacturer -like '*Lenovo*') {
+    Write-Host "`nLenovo detected. A staged driver pack EXE can cause a BSOD during first boot." -ForegroundColor Yellow
+    do {
+        $DriverChoice = Read-Host "Keep driver pack if found? (y/n)"
+    } while ($DriverChoice -notmatch '^[YyNn]$')
+    $KeepDrivers = $DriverChoice -match '^[Yy]$'
+}
+
 Write-Host "`nAll inputs collected. Starting imaging - you can walk away." -ForegroundColor Green
 
 # =====================================================================
@@ -66,7 +79,6 @@ Write-Host "OSD module loaded." -ForegroundColor Green
 # =====================================================================
 # IMAGE THE DEVICE
 # =====================================================================
-$Manufacturer = (Get-CimInstance -ClassName Win32_ComputerSystem).Manufacturer
 Write-Host "Detected manufacturer: $Manufacturer" -ForegroundColor Green
 
 $Params = @{
@@ -225,34 +237,16 @@ $FirstLogonBlock
 </unattend>
 "@
 
-# On Lenovo, the staged driver pack EXE has been known to crash Windows Setup during first boot.
-# Prompt the tech to decide whether to keep or remove it.
 if ($Manufacturer -like '*Lenovo*' -and (Test-Path 'C:\Drivers')) {
     $DriverExe = Get-ChildItem 'C:\Drivers' -Filter '*.exe' -Recurse -ErrorAction SilentlyContinue |
                  Select-Object -First 1
 
     if ($DriverExe) {
-        Write-Host "`n========================================" -ForegroundColor Cyan
-        Write-Host "  Lenovo Driver Pack Detected" -ForegroundColor Cyan
-        Write-Host "========================================" -ForegroundColor Cyan
-        Write-Host "  File: $($DriverExe.Name)" -ForegroundColor White
-        Write-Host ""
-        Write-Host "  Known issue: this EXE may force a restart" -ForegroundColor Yellow
-        Write-Host "  during Windows Setup and cause a BSOD." -ForegroundColor Yellow
-        Write-Host ""
-        Write-Host "  [Y] Keep drivers - let SetupComplete install them" -ForegroundColor Green
-        Write-Host "  [N] Remove drivers - skip install, handle manually later" -ForegroundColor Red
-        Write-Host ""
-
-        do {
-            $DriverChoice = Read-Host "  Keep Lenovo driver pack? (y/n)"
-        } while ($DriverChoice -notmatch '^[YyNn]$')
-
-        if ($DriverChoice -match '^[Nn]$') {
+        if ($KeepDrivers) {
+            Write-Host "Driver pack kept - SetupComplete will install on first boot." -ForegroundColor Green
+        } else {
             Remove-Item 'C:\Drivers' -Recurse -Force
             Write-Host "Driver pack removed - handle drivers manually post-imaging." -ForegroundColor Yellow
-        } else {
-            Write-Host "Driver pack kept - SetupComplete will install on first boot." -ForegroundColor Green
         }
     }
 }
