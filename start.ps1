@@ -148,7 +148,7 @@ Write-Host "PostImaging.ps1 written to new OS." -ForegroundColor Green
 
 # Register PostImaging.ps1 via RunOnce in the offline registry.
 # RunOnce fires after the shell loads so winget and PSGallery are fully available.
-$RunOnceCmd = 'powershell -ExecutionPolicy Bypass -File C:\Windows\Setup\Scripts\PostImaging.ps1'
+$RunOnceCmd = 'powershell -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\Windows\Setup\Scripts\PostImaging.ps1'
 if ($InstallChrome)          { $RunOnceCmd += ' -InstallChrome' }
 if ($InstallPSWindowsUpdate) { $RunOnceCmd += ' -InstallPSWindowsUpdate' }
 
